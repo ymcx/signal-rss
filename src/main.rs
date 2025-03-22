@@ -2,7 +2,6 @@ use base64::prelude::*;
 use chrono::{DateTime, Utc};
 
 use atom_syndication::Feed;
-use core::panic;
 use dbus::blocking::LocalConnection;
 use rss::Channel;
 use std::{env::args, error::Error, fs, thread::sleep, time::Duration};
@@ -19,6 +18,62 @@ fn modify_url(url: &str, description: &str) -> String {
     url.replace("www.youtube.com", "yewtu.be")
 }
 
+fn parse_feeds_atom(
+    messages: &mut Vec<String>,
+    content: &[u8],
+    format: &str,
+    url: &str,
+    checked: &DateTime<Utc>,
+) {
+    let feed = Feed::read_from(content);
+    if let Err(_) = feed {
+        eprintln!("Couldn't read {} from {}", format, url);
+        return;
+    }
+
+    for entry in feed.unwrap().entries {
+        let time = &entry.published.unwrap_or_default();
+        if time < checked {
+            continue;
+        }
+
+        let description = entry.summary.unwrap_or_default().value;
+        let title = entry.title.value;
+        let link = modify_url(&entry.links[0].href, &description);
+        let message = format!("{}\n{}", title, link);
+
+        messages.push(message);
+    }
+}
+
+fn parse_feeds_rss(
+    messages: &mut Vec<String>,
+    content: &[u8],
+    format: &str,
+    url: &str,
+    checked: &DateTime<Utc>,
+) {
+    let feed = Channel::read_from(content);
+    if let Err(_) = feed {
+        eprintln!("Couldn't read {} from {}", format, url);
+        return;
+    }
+
+    for entry in feed.unwrap().items {
+        let time =
+            &DateTime::parse_from_rfc2822(&entry.pub_date.unwrap_or_default()).unwrap_or_default();
+        if time < checked {
+            continue;
+        }
+
+        let description = entry.description.unwrap_or_default();
+        let title = entry.title.unwrap_or_default();
+        let link = modify_url(&entry.link.unwrap_or_default(), &description);
+        let message = format!("{}\n{}", title, link);
+
+        messages.push(message);
+    }
+}
 async fn parse_feeds(feeds: &str, checked: &DateTime<Utc>) -> Result<Vec<String>, Box<dyn Error>> {
     let mut messages: Vec<String> = Vec::new();
 
@@ -29,48 +84,9 @@ async fn parse_feeds(feeds: &str, checked: &DateTime<Utc>) -> Result<Vec<String>
         let content = &reqwest::get(url).await?.bytes().await?[..];
 
         match format {
-            "atom" => {
-                let feed = Feed::read_from(content);
-                if let Err(_) = feed {
-                    continue;
-                }
-
-                for entry in feed.unwrap().entries {
-                    let time = entry.published.unwrap_or_default();
-                    if &time <= checked {
-                        continue;
-                    }
-
-                    let title = entry.title.value;
-                    let description = entry.summary.unwrap_or_default().value;
-                    let link = modify_url(&entry.links[0].href, &description);
-                    let message = format!("{}\n{}", title, link);
-
-                    messages.push(message);
-                }
-            }
-            "rss" => {
-                let feed = Channel::read_from(content);
-                if let Err(_) = feed {
-                    continue;
-                }
-
-                for entry in feed.unwrap().items {
-                    let time = DateTime::parse_from_rfc2822(&entry.pub_date.unwrap_or_default())
-                        .unwrap_or_default();
-                    if &time <= checked {
-                        continue;
-                    }
-
-                    let title = entry.title.unwrap_or_default();
-                    let description = entry.description.unwrap_or_default();
-                    let link = modify_url(&entry.link.unwrap_or_default(), &description);
-                    let message = format!("{}\n{}", title, link);
-
-                    messages.push(message);
-                }
-            }
-            _ => panic!(),
+            "atom" => parse_feeds_atom(&mut messages, &content, &format, &url, &checked),
+            "rss" => parse_feeds_rss(&mut messages, &content, &format, &url, &checked),
+            _ => panic!("Invalid feed format provided"),
         }
     }
 
@@ -84,6 +100,7 @@ async fn main() {
     let mut checked = Utc::now();
 
     loop {
+        println!("Parsing all feeds...");
         parse_feeds(&feeds, &checked)
             .await
             .unwrap()
@@ -100,13 +117,21 @@ async fn main() {
 fn get_group() -> Vec<u8> {
     let args: Vec<String> = args().collect();
     let id = &args[1];
-    BASE64_STANDARD.decode(id).unwrap()
+    if let Ok(group) = BASE64_STANDARD.decode(id) {
+        return group;
+    }
+
+    panic!("Couldn't parse the group id");
 }
 
 fn get_feeds() -> String {
     let args: Vec<String> = args().collect();
     let file = &args[2];
-    fs::read_to_string(file).unwrap()
+    if let Ok(feeds) = fs::read_to_string(file) {
+        return feeds;
+    }
+
+    panic!("Couldn't read from the feeds file");
 }
 
 fn send(message: &str, group: &Vec<u8>) -> Result<(), Box<dyn Error>> {
@@ -121,5 +146,6 @@ fn send(message: &str, group: &Vec<u8>) -> Result<(), Box<dyn Error>> {
         "sendGroupMessage",
         (message, Vec::<&str>::new(), group),
     )?;
+
     Ok(())
 }
