@@ -20,6 +20,11 @@ async fn parse_feeds(feeds: &str, checked: &DateTime<Utc>) -> Result<Vec<String>
             "atom" => {
                 let feed = Feed::read_from(content)?;
                 for entry in feed.entries {
+                    let time = entry.published.unwrap();
+                    if &time <= checked {
+                        continue;
+                    }
+
                     let title = entry.title.value;
                     let link = entry.links[0].href.clone();
                     let message = format!("{}\n{}", title, link);
@@ -30,6 +35,11 @@ async fn parse_feeds(feeds: &str, checked: &DateTime<Utc>) -> Result<Vec<String>
             "rss" => {
                 let feed = Channel::read_from(content)?;
                 for entry in feed.items {
+                    let time = DateTime::parse_from_rfc2822(&entry.pub_date.unwrap())?;
+                    if &time <= checked {
+                        continue;
+                    }
+
                     let title = entry.title.unwrap();
                     let link = entry.link.unwrap();
                     let message = format!("{}\n{}", title, link);
