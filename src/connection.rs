@@ -6,9 +6,14 @@ pub struct SignalConnection {
 }
 
 impl SignalConnection {
-    pub fn new() -> Result<Self, Box<dyn Error>> {
-        let connection = LocalConnection::new_session()?;
-        Ok(Self { connection })
+    pub fn new() -> Self {
+        match LocalConnection::new_session() {
+            Ok(connection) => Self { connection },
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
     }
 
     pub fn send(&self, message: &str, group: &[u8]) -> Result<(), Box<dyn Error>> {

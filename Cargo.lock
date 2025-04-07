@@ -1201,7 +1201,7 @@ dependencies = [
 
 [[package]]
 name = "signal-rss"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "atom_syndication",
  "base64",

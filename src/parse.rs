@@ -1,6 +1,6 @@
 use crate::{connection::SignalConnection, feed::Feed};
 use base64::{Engine, prelude::BASE64_STANDARD};
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, Local};
 use std::error::Error;
 
 pub async fn parse_feeds(
@@ -35,6 +35,10 @@ fn arg() -> String {
         .get(1)
         .unwrap_or(&String::default())
         .to_string()
+}
+
+pub fn time() -> DateTime<FixedOffset> {
+    Local::now().fixed_offset()
 }
 
 pub fn get_feeds() -> Vec<(Vec<u8>, String)> {
