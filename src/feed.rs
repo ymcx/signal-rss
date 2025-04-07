@@ -5,7 +5,7 @@ use rss::{Channel, Item};
 use std::error::Error;
 
 pub struct Feed {
-    articles: Vec<Article>,
+    pub articles: Vec<Article>,
 }
 
 pub enum Article {
@@ -14,73 +14,61 @@ pub enum Article {
 }
 
 impl Feed {
-    fn is_atom(content: &[u8]) -> Option<bool> {
+    fn is_atom(content: &[u8]) -> Result<bool, Box<dyn Error>> {
         let content = std::str::from_utf8(content).unwrap_or_default();
         let mut reader = Reader::from_str(content);
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) => return Some(e.name().as_ref() == b"feed"),
-                Ok(Event::Eof) => return None,
+                Ok(Event::Start(e)) => return Ok(e.name().as_ref() == b"feed"),
+                Ok(Event::Eof) => return Err("Invalid feed".into()),
                 _ => continue,
             }
         }
     }
 
     pub async fn new(url: &str) -> Result<Self, Box<dyn Error>> {
-        let content = &reqwest::get(url).await?.bytes().await?[..];
-        let atom = Self::is_atom(content);
-        if atom.is_none() {
-            println!("voivutt");
-            return Err("".into());
-        }
-        let atom = atom.unwrap();
-        println!("is atom {}", atom);
-
-        let articles: Vec<Article> = if atom {
-            atom_syndication::Feed::read_from(content)?
+        let content = reqwest::get(url).await?.bytes().await?;
+        let is_atom = Self::is_atom(content.as_ref())?;
+        let articles = if is_atom {
+            atom_syndication::Feed::read_from(content.as_ref())?
                 .entries
-                .iter()
-                .map(|i| Article::Atom(i.clone()))
+                .into_iter()
+                .map(Article::Atom)
                 .collect()
         } else {
-            Channel::read_from(content)?
+            Channel::read_from(content.as_ref())?
                 .items
-                .iter()
-                .map(|i| Article::Rss(i.clone()))
+                .into_iter()
+                .map(Article::Rss)
                 .collect()
         };
-        Ok(Self { articles })
-    }
 
-    pub fn get(self) -> Vec<Article> {
-        self.articles
+        Ok(Self { articles })
     }
 }
 
 impl Article {
     pub fn title(&self) -> String {
         match self {
-            Article::Atom(entry) => entry.title.value.clone(),
-            Article::Rss(entry) => entry.title.clone().unwrap_or_default(),
+            Article::Atom(a) => a.title().value.clone(),
+            Article::Rss(a) => a.title().unwrap_or_default().to_string(),
         }
     }
 
     pub fn url(&self) -> String {
         match self {
-            Article::Atom(entry) => entry.links.get(0).unwrap().href.clone(),
-            Article::Rss(entry) => entry.link.clone().unwrap(),
+            Article::Atom(a) => a.links().first().map_or("".to_string(), |i| i.href.clone()),
+            Article::Rss(a) => a.link().unwrap_or_default().to_string(),
         }
     }
 
     pub fn time(&self) -> DateTime<FixedOffset> {
         match self {
-            Article::Atom(entry) => entry.published.unwrap_or_default(),
-            Article::Rss(entry) => entry
-                .pub_date
-                .as_ref()
-                .and_then(|d| DateTime::parse_from_rfc2822(d).ok())
-                .unwrap(),
+            Article::Atom(a) => a.published.unwrap_or_default(),
+            Article::Rss(a) => a.pub_date.as_ref().map_or(DateTime::default(), |i| {
+                DateTime::parse_from_rfc2822(i).unwrap_or_default()
+            }),
         }
     }
 }

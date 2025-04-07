@@ -9,7 +9,7 @@ async fn parse_feeds2(
 ) {
     let feed = Feed::new(url).await;
 
-    for entry in feed.unwrap().get() {
+    for entry in feed.unwrap().articles {
         let time = entry.time();
         if &time < checked {
             // continue;
