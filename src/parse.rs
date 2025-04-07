@@ -1,10 +1,10 @@
-use crate::{feed::Feed, send::DBUS};
+use crate::{connection::SignalConnection, feed::Feed};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::{DateTime, FixedOffset};
 use std::error::Error;
 
 pub async fn parse_feeds(
-    connection: &DBUS,
+    connection: &SignalConnection,
     feeds: &Vec<(Vec<u8>, String)>,
     last_sync: &DateTime<FixedOffset>,
 ) -> Result<(), Box<dyn Error>> {
@@ -22,7 +22,7 @@ pub async fn parse_feeds(
             let title = article.title();
             let url = article.url();
             let message = &format!("{}\n{}", title, url);
-            connection.send(message, group);
+            connection.send(message, group)?;
         }
     }
 

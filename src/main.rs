@@ -1,16 +1,16 @@
 use chrono::Local;
-use send::DBUS;
+use connection::SignalConnection;
 use std::{thread::sleep, time::Duration};
 
+mod connection;
 mod feed;
 mod parse;
-mod send;
 
 #[tokio::main]
 async fn main() {
     let feeds = parse::get_feeds();
     let mut checked = Local::now().fixed_offset();
-    let dbus = DBUS::new();
+    let dbus = SignalConnection::new().unwrap();
 
     loop {
         println!("Parsing all feeds...");
@@ -22,4 +22,3 @@ async fn main() {
         sleep(Duration::from_secs(60 * 60));
     }
 }
-
