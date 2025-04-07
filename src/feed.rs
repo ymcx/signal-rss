@@ -15,7 +15,7 @@ pub enum Article {
 
 impl Feed {
     fn is_atom(content: &[u8]) -> Result<bool, Box<dyn Error>> {
-        let content = std::str::from_utf8(content).unwrap_or_default();
+        let content = std::str::from_utf8(content)?;
         let mut reader = Reader::from_str(content);
 
         loop {
