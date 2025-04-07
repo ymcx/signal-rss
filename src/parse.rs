@@ -5,12 +5,12 @@ use std::error::Error;
 
 pub async fn parse_feeds(
     connection: &DBUS,
-    feeds: &Vec<(String, Vec<u8>)>,
+    feeds: &Vec<(Vec<u8>, String)>,
     last_sync: &DateTime<FixedOffset>,
 ) -> Result<(), Box<dyn Error>> {
     for feed in feeds {
-        let feed_url = &feed.0;
-        let group = &feed.1;
+        let group = &feed.0;
+        let feed_url = &feed.1;
 
         let articles = Feed::new(feed_url).await?.articles;
         for article in articles {
@@ -37,7 +37,7 @@ fn arg() -> String {
         .to_string()
 }
 
-pub fn get_feeds() -> Vec<(String, Vec<u8>)> {
+pub fn get_feeds() -> Vec<(Vec<u8>, String)> {
     let file = arg();
     if let Ok(feeds) = std::fs::read_to_string(file) {
         return feeds
@@ -45,9 +45,9 @@ pub fn get_feeds() -> Vec<(String, Vec<u8>)> {
             .map(|line| {
                 let mut parts = line.split_whitespace();
                 let group = parts.next().unwrap_or_default().to_string();
+                let group_decoded = BASE64_STANDARD.decode(group).unwrap_or_default();
                 let url = parts.next().unwrap_or_default().to_string();
-                let url_decoded = BASE64_STANDARD.decode(url).unwrap_or_default();
-                (group, url_decoded)
+                (group_decoded, url)
             })
             .collect();
     }

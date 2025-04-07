@@ -14,7 +14,9 @@ async fn main() {
 
     loop {
         println!("Parsing all feeds...");
-        let _ = parse::parse_feeds(&dbus, &feeds, &checked).await;
+        if let Err(e) = parse::parse_feeds(&dbus, &feeds, &checked).await {
+            println!("{}", e);
+        }
         checked = Local::now().fixed_offset();
         println!("Sleeping...");
         sleep(Duration::from_secs(60 * 60));

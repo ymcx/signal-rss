@@ -19,8 +19,8 @@ impl DBUS {
         Self { connection }
     }
 
-    pub fn send(&self, _message: &str, _group: &Vec<u8>) {
-        // println!("sending {}", message);
+    pub fn send(&self, message: &str, _group: &Vec<u8>) {
+        println!("sending {}", message);
         // let _: Result<(Vec<String>,), dbus::Error> = self.connection.method_call(
         //     "org.asamk.Signal",
         //     "sendGroupMessage",
