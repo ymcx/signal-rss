@@ -1,6 +1,7 @@
 use atom_syndication::Entry;
 use chrono::{DateTime, FixedOffset};
 use quick_xml::{Reader, events::Event};
+use reqwest::Url;
 use rss::{Channel, Item};
 use std::error::Error;
 
@@ -61,6 +62,12 @@ impl Article {
             Article::Atom(a) => a.links().first().map_or("".to_string(), |i| i.href.clone()),
             Article::Rss(a) => a.link().unwrap_or_default().to_string(),
         }
+    }
+
+    pub fn host(url: &str) -> String {
+        Url::parse(url).map_or("".to_string(), |i| {
+            i.host_str().unwrap_or_default().to_string()
+        })
     }
 
     pub fn time(&self) -> DateTime<FixedOffset> {
